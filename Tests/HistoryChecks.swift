@@ -20,5 +20,20 @@ import MemoryCore
         raw.app = 20
         precondition(Snapshot(time: start, raw: raw).used == 16)
         print("PASS: 48h simulated history bounded at 301/361/1441 points, latest values, long sleep pruning, composition and saturation")
+        let helper = URL(fileURLWithPath: "/Applications/Google Chrome.app/Contents/Frameworks/Chrome Framework.framework/Helpers/Google Chrome Helper.app/Contents/MacOS/Google Chrome Helper")
+        precondition(ProcessIconResolver.applicationURL(forExecutableURL: helper)?.path == "/Applications/Google Chrome.app")
+        let codex = URL(fileURLWithPath: "/Applications/ChatGPT.app/Contents/Frameworks/Codex Framework.framework/Helpers/Codex (Renderer).app/Contents/MacOS/Codex (Renderer)")
+        precondition(ProcessIconResolver.applicationURL(forExecutableURL: codex)?.path == "/Applications/ChatGPT.app")
+        precondition(ProcessIconResolver.applicationURL(forExecutableURL: URL(fileURLWithPath: "/usr/bin/top")) == nil)
+        var invalid = MMProcessIdentity()
+        precondition(!mm_read_process_identity(-1, &invalid))
+        let resolver = ProcessIconResolver()
+        var rows = [MMProcess](repeating: MMProcess(), count: 5)
+        let count = Int(mm_read_processes(&rows, 5))
+        for row in rows.prefix(count) {
+            let icon = resolver.icon(for: row.pid)
+            print("Live process icon: pid=\(row.pid) resolved=\(icon != nil)")
+        }
+        print("PASS: outer app icon selection, nested helper bundles, non-app path and invalid PID")
     }
 }

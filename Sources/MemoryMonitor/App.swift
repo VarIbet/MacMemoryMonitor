@@ -11,6 +11,8 @@ import Combine
     private var popover: NSPopover!
     private var settingsWindow: NSWindow?
     private var observers: [NSObjectProtocol] = []
+    private var globalMouseMonitor: Any?
+    private var localMouseMonitor: Any?
     let model = MonitorModel()
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let identifier = Bundle.main.bundleIdentifier,
@@ -25,7 +27,7 @@ import Combine
         popover = NSPopover(); popover.behavior = .transient; popover.animates = false; popover.delegate = self
         model.onUpdate = { [weak self] in self?.refresh() }
         let center = NSWorkspace.shared.notificationCenter
-        observers.append(center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.model.sleep() } })
+        observers.append(center.addObserver(forName: NSWorkspace.willSleepNotification, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.popover.performClose(nil); self?.model.sleep() } })
         observers.append(center.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in Task { @MainActor in self?.model.wake() } })
         refresh()
         if CommandLine.arguments.contains("--show-dashboard") { DispatchQueue.main.async { self.togglePanel() } }
@@ -54,8 +56,32 @@ import Combine
         }
         model.panelVisible = true; model.scanProcesses()
         popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        startDismissMonitors()
     }
-    func popoverDidClose(_ notification: Notification) { model.panelVisible = false }
+    private func startDismissMonitors() {
+        stopDismissMonitors()
+        let mouseEvents: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        // Mouse-only observation needs no keyboard monitoring or Accessibility permission.
+        globalMouseMonitor = NSEvent.addGlobalMonitorForEvents(matching: mouseEvents) { [weak self] _ in
+            self?.popover.performClose(nil)
+        }
+        localMouseMonitor = NSEvent.addLocalMonitorForEvents(matching: mouseEvents) { [weak self] event in
+            guard let self, self.popover.isShown, let window = event.window else { return event }
+            let panelWindow = self.popover.contentViewController?.view.window
+            if window == panelWindow || window.parent == panelWindow || window.level == .popUpMenu { return event }
+            if let button = self.item.button, window == button.window,
+               button.bounds.contains(button.convert(event.locationInWindow, from: nil)) { return event }
+            self.popover.performClose(nil)
+            return event // Preserve the click in the destination window.
+        }
+    }
+    private func stopDismissMonitors() {
+        if let globalMouseMonitor { NSEvent.removeMonitor(globalMouseMonitor) }
+        if let localMouseMonitor { NSEvent.removeMonitor(localMouseMonitor) }
+        globalMouseMonitor = nil; localMouseMonitor = nil
+    }
+    func applicationDidResignActive(_ notification: Notification) { popover?.performClose(nil) }
+    func popoverDidClose(_ notification: Notification) { model.panelVisible = false; stopDismissMonitors() }
     func openSettings() {
         popover.performClose(nil)
         if settingsWindow == nil {
@@ -70,5 +96,5 @@ import Combine
         let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor") ?? URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app")
         NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
     }
-    func applicationWillTerminate(_ notification: Notification) { model.sleep(); for observer in observers { NSWorkspace.shared.notificationCenter.removeObserver(observer) } }
+    func applicationWillTerminate(_ notification: Notification) { stopDismissMonitors(); model.sleep(); for observer in observers { NSWorkspace.shared.notificationCenter.removeObserver(observer) } }
 }

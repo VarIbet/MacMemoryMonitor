@@ -38,6 +38,15 @@ static int compare(const void *a, const void *b) {
     uint64_t x = ((const MMProcess *)a)->footprint, y = ((const MMProcess *)b)->footprint;
     return (y > x) - (y < x);
 }
+bool mm_read_process_identity(int32_t pid, MMProcessIdentity *out) {
+    memset(out, 0, sizeof(*out));
+    if (pid <= 0) return false;
+    struct proc_bsdinfo info = {0};
+    bool has_info = proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, sizeof(info)) == sizeof(info);
+    if (has_info) out->parent_pid = info.pbi_ppid;
+    int length = proc_pidpath(pid, out->executable_path, sizeof(out->executable_path));
+    return has_info || length > 0;
+}
 int mm_read_processes(MMProcess *out, int capacity) {
     int count = proc_listallpids(NULL, 0);
     if (count <= 0 || capacity <= 0) return 0;

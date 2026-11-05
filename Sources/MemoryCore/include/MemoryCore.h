@@ -7,5 +7,7 @@ typedef struct {
     bool swap_valid;
 } MMMemory;
 typedef struct { int32_t pid; uint64_t footprint; char name[1024]; } MMProcess;
+typedef struct { int32_t parent_pid; char executable_path[4096]; } MMProcessIdentity;
 bool mm_read_memory(MMMemory *out);
 int mm_read_processes(MMProcess *out, int capacity);
+bool mm_read_process_identity(int32_t pid, MMProcessIdentity *out);

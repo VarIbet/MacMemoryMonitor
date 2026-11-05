@@ -135,16 +135,17 @@ struct ProcessRow: Identifiable {
         worker.async { [weak self] in
             var entries = [MMProcess](repeating: MMProcess(), count: 5)
             let count = mm_read_processes(&entries, 5)
-            let results = entries.prefix(Int(count)).map { entry -> (Int32, String, UInt64) in
+            let iconResolver = ProcessIconResolver()
+            let results = entries.prefix(Int(count)).map { entry -> (Int32, String, UInt64, NSImage?) in
                 var name = entry.name
                 let text = withUnsafePointer(to: &name) { $0.withMemoryRebound(to: CChar.self, capacity: 1024) { String(cString: $0) } }
-                return (entry.pid, text, entry.footprint)
+                return (entry.pid, text, entry.footprint, iconResolver.icon(for: entry.pid))
             }
             DispatchQueue.main.async {
                 guard let self else { return }; self.scanning = false
-                self.processes = results.map { pid, name, bytes in
+                self.processes = results.map { pid, name, bytes, icon in
                     let app = NSRunningApplication(processIdentifier: pid)
-                    return ProcessRow(id: pid, name: app?.localizedName ?? name, bytes: bytes, icon: app?.icon)
+                    return ProcessRow(id: pid, name: app?.localizedName ?? name, bytes: bytes, icon: icon)
                 }
                 self.processDate = Date()
             }

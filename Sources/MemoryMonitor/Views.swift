@@ -107,7 +107,7 @@ struct DashboardView: View {
             if model.processes.isEmpty { Text(model.processDate == nil ? "正在读取进程…" : "暂无可读取的进程").font(.caption).foregroundStyle(.secondary) }
             ForEach(model.processes) { process in
                 HStack(spacing: 8) {
-                    Group { if let icon = process.icon { Image(nsImage: icon).resizable() } else { Image(systemName: "app.dashed").resizable() } }.frame(width: 20, height: 20)
+                    Group { if let icon = process.icon { Image(nsImage: icon).resizable() } else { Image(systemName: "memorychip").resizable().foregroundStyle(.secondary) } }.scaledToFit().frame(width: 20, height: 20)
                     Text(process.name).lineLimit(1).help("PID \(process.id)")
                     Spacer(minLength: 8)
                     Text(memoryText(process.bytes, precision: 2)).foregroundStyle(.secondary).monospacedDigit()
@@ -138,7 +138,7 @@ struct PreferencesView: View {
                 if let status = model.notificationStatus { Text(status).font(.caption) }
             }
             if let message { Text(message).foregroundStyle(.secondary).font(.caption) }
-            Text("所有监控均在本机完成。无账户、无上传、无网络请求。\nMemory Monitor 1.0 · Apple Silicon · macOS 14+").font(.caption).foregroundStyle(.secondary)
+            Text("所有监控均在本机完成。无账户、无上传、无网络请求。\nMemory Monitor \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "开发版") · Apple Silicon · macOS 14+").font(.caption).foregroundStyle(.secondary)
         }.formStyle(.grouped).frame(width: 460, height: 500)
         .onAppear { refreshLogin() }
     }
